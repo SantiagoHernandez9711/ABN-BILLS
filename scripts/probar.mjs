@@ -28,6 +28,6 @@ const missing = missingProfileVars();
 if (missing.length) console.log(`⚠️  Faltan datos para el Word: ${missing.join(', ')}\n`);
 
 fs.mkdirSync('salida-prueba', { recursive: true });
-fs.writeFileSync(`salida-prueba/${draft.fileBase}.xlsx`, buildExcel(draft));
+fs.writeFileSync(`salida-prueba/${draft.fileBase}.xlsx`, await buildExcel(draft));
 fs.writeFileSync(`salida-prueba/${draft.fileBase}.docx`, await buildWord(draft));
 console.log('Excel y Word guardados en salida-prueba/');
