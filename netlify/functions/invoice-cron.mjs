@@ -1,9 +1,11 @@
-// Función programada: corre cada hora y decide si toca mandar la vista previa
-// (1 día antes del envío, a la hora configurada en settings.notifyHour, hora de Melbourne)
+// Función programada: corre cada hora (hora de Melbourne) y:
+//  1) el sábado a las 20:00 manda la vista previa a Telegram
+//  2) el domingo a las 12:00 recuerda si no has aprobado
+//  3) el domingo a las 21:00 envía el correo si lo aprobaste
 import { config as settings } from './lib/config.mjs';
-import { periodToNotifyOn, upcomingPeriod, todayLocal } from './lib/invoice.mjs';
-import { createPreview, getRecord, remind } from './lib/flow.mjs';
-import { zonedParts } from './lib/dates.mjs';
+import { periodToNotifyOn, upcomingPeriod, periodFromStart, todayLocal } from './lib/invoice.mjs';
+import { createPreview, getRecord, remind, sendIfDue } from './lib/flow.mjs';
+import { zonedParts, addDays } from './lib/dates.mjs';
 import { tg, esc } from './lib/telegram.mjs';
 
 export default async () => {
@@ -11,25 +13,20 @@ export default async () => {
   const hour = zonedParts(Date.now(), settings.timezone).h;
 
   try {
-    // 1) Vista previa el día de notificación
     const period = periodToNotifyOn(today);
-    if (period && hour >= settings.notifyHour) {
-      const rec = await getRecord(period.start);
-      if (!rec) {
-        await createPreview(period, { reason: 'auto' });
-        console.log('Vista previa enviada para', period.start);
-      }
+    if (period && hour >= settings.notifyHour && !(await getRecord(period.start))) {
+      await createPreview(period, { reason: 'auto' });
+      console.log('Vista previa enviada para', period.start);
     }
 
-    // 2) Recordatorio el día de envío (9am) si todavía no se aprobó
-    if (hour >= 9) {
-      const p = upcomingPeriod(today);
-      if (p.sendDay === today) await remind(p.start);
-    }
+    const current = upcomingPeriod(today);
+    const previous = periodFromStart(addDays(current.start, -settings.periodDays));
+    if (current.sendDay === today && hour >= settings.reminderHour && hour < settings.sendHour) await remind(current.start);
+    for (const p of [previous, current]) await sendIfDue(p);
   } catch (err) {
     console.error(err);
     if (process.env.TELEGRAM_CHAT_ID) {
-      await tg.send(process.env.TELEGRAM_CHAT_ID, `❌ Error generando el invoice automático:\n<code>${esc(err.message)}</code>\nPuedes intentar con /preview`).catch(() => {});
+      await tg.send(process.env.TELEGRAM_CHAT_ID, `❌ Error en el invoice automático:\n<code>${esc(err.message)}</code>\nPuedes intentar con /preview`).catch(() => {});
     }
   }
   return new Response('ok');

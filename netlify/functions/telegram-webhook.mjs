@@ -1,15 +1,17 @@
 // Recibe los mensajes y botones del bot de Telegram
-import { upcomingPeriod, periodFromStart, todayLocal, formatInvoiceNo } from './lib/invoice.mjs';
-import { createPreview, approve, cancel, getMeta, setMeta, getRecord, money } from './lib/flow.mjs';
+import { upcomingPeriod, periodFromStart, todayLocal, formatInvoiceNo, isPeriodStart } from './lib/invoice.mjs';
+import { createPreview, approve, sendNow, undo, cancel, getMeta, setMeta, getRecord, money, sendTimeText } from './lib/flow.mjs';
+import { victorianHolidays } from './lib/holidays.mjs';
 import { tg, esc } from './lib/telegram.mjs';
 import { config as settings } from './lib/config.mjs';
-import { diffDays } from './lib/dates.mjs';
+import { auDate } from './lib/dates.mjs';
 
 const HELP = `<b>Comandos</b>
 /preview – genera la vista previa del próximo invoice
 /preview AAAA-MM-DD – vista previa del período que empieza ese día
 /estado – próximo período y número de invoice
 /numero 13 – cambia el próximo número de invoice
+/feriados – feriados de Victoria de este año (tarifa doble)
 /ayuda – este mensaje`;
 
 export default async (req) => {
@@ -30,10 +32,10 @@ export default async (req) => {
       }
       const [action, start] = cq.data.split(':');
       let reply = '';
-      if (action === 'approve') {
-        await tg.answer(cq.id, 'Enviando…');
-        reply = await approve(start, cq.message.message_id);
-        if (!reply.startsWith('✅') && !reply.startsWith('❌')) await tg.send(allowed, esc(reply));
+      if (action === 'approve' || action === 'now') {
+        await tg.answer(cq.id, action === 'now' ? 'Enviando…' : 'Aprobando…');
+        reply = action === 'now' ? await sendNow(start, cq.message.message_id) : await approve(start, cq.message.message_id);
+        if (/^(ℹ️|⚠️|⏳|Ese|Esa|Ya)/.test(reply)) await tg.send(allowed, esc(reply));
         return new Response('ok');
       }
       if (action === 'regen') {
@@ -42,6 +44,7 @@ export default async (req) => {
         return new Response('ok');
       }
       if (action === 'cancel') reply = await cancel(start);
+      if (action === 'undo') reply = await undo(start);
       await tg.answer(cq.id, reply);
       return new Response('ok');
     }
@@ -65,7 +68,7 @@ export default async (req) => {
         let period;
         if (arg) {
           if (!/^\d{4}-\d{2}-\d{2}$/.test(arg)) { await tg.send(chat, 'Usa el formato /preview 2026-11-09'); break; }
-          if (diffDays(arg, settings.periodAnchor) % settings.periodDays !== 0) {
+          if (!isPeriodStart(arg)) {
             await tg.send(chat, `⚠️ ${arg} no es inicio de una quincena (empiezan cada ${settings.periodDays} días desde ${settings.periodAnchor}).`);
             break;
           }
@@ -81,10 +84,11 @@ export default async (req) => {
         const p = upcomingPeriod(todayLocal());
         const meta = await getMeta();
         const rec = await getRecord(p.start);
-        const status = { pending: 'esperando aprobación', sent: 'enviado', cancelled: 'cancelado', sending: 'enviando' }[rec?.status] || 'sin generar';
+        const status = { pending: 'esperando aprobación', approved: `aprobado, sale el ${sendTimeText(p)}`, sent: 'enviado', cancelled: 'cancelado', sending: 'enviando' }[rec?.status] || 'sin generar';
         await tg.send(chat, [
-          `<b>Próximo período:</b> ${p.start} → ${p.end}`,
-          `<b>Vista previa:</b> ${p.notifyDay} a las ${settings.notifyHour}:00`,
+          `<b>Próximo período:</b> ${auDate(p.start)} → ${auDate(p.end)}`,
+          `<b>Vista previa:</b> ${auDate(p.notifyDay)} a las ${settings.notifyHour}:00`,
+          `<b>Envío:</b> ${sendTimeText(p)}`,
           `<b>Estado:</b> ${status}${rec?.draft ? ` (${esc(rec.draft.invoice)}, ${money(rec.draft.totalAmount)})` : ''}`,
           `<b>Próximo número:</b> ${formatInvoiceNo(meta.nextNumber)}`,
         ].join('\n'));
@@ -97,6 +101,12 @@ export default async (req) => {
         meta.nextNumber = n;
         await setMeta(meta);
         await tg.send(chat, `✓ El próximo invoice será <b>${formatInvoiceNo(n)}</b>.\n(Si ya hay una vista previa pendiente, toca 🔄 Regenerar.)`);
+        break;
+      }
+      case '/feriados': {
+        const year = parseInt(arg, 10) || +todayLocal().slice(0, 4);
+        const list = [...victorianHolidays(year)].sort().map(([d, n]) => `${auDate(d)}  ${esc(n)}`);
+        await tg.send(chat, `<b>Feriados de Victoria ${year}</b> (tarifa ×${settings.holidayMultiplier})\n<pre>${list.join('\n')}</pre>`);
         break;
       }
       default:

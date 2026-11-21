@@ -21,7 +21,7 @@ export function parseIcs(text, timeZone) {
     if (line === 'BEGIN:VEVENT') {
       cur = {};
     } else if (line === 'END:VEVENT' && cur) {
-      if (cur.start && cur.end && cur.summary && !cur.allDay && cur.status !== 'CANCELLED') {
+      if (cur.start && cur.end > cur.start && cur.summary && !cur.allDay && cur.status !== 'CANCELLED') {
         const hours = (cur.end - cur.start) / 3600000;
         events.push({
           summary: cur.summary,

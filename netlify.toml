@@ -1,4 +1,2 @@
 [functions]
   node_bundler = "esbuild"
-  # La plantilla Word se sube junto con las funciones
-  included_files = ["netlify/functions/templates/**"]

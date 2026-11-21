@@ -10,7 +10,10 @@ export function buildExcel(draft) {
     [null, null, null, null, null, null, null],
     [null, null, 'Date', 'Building', 'Rate', 'Hours', 'Total'],
   ];
-  for (const l of draft.lines) ws.push([null, null, auDate(l.date), l.building, l.rate, l.hours, l.total]);
+  for (const l of draft.lines) {
+    const building = l.holiday ? `${l.building} (Public Holiday - ${l.holiday})` : l.building;
+    ws.push([null, null, auDate(l.date), building, l.rate, l.hours, l.total]);
+  }
   ws.push([null, null, null, null, 'TOTAL', draft.totalHours, draft.totalAmount]);
 
   const sheet = XLSX.utils.aoa_to_sheet(ws);
