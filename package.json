@@ -1,0 +1,26 @@
+{
+  "name": "abn-bills",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "probar": "node scripts/probar.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SantiagoHernandez9711/ABN-BILLS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SantiagoHernandez9711/ABN-BILLS/issues"
+  },
+  "homepage": "https://github.com/SantiagoHernandez9711/ABN-BILLS#readme",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.9",
+    "docxtemplater": "^3.71.1",
+    "nodemailer": "^10.6.1",
+    "pizzip": "^3.3.0",
+    "xlsx": "^0.18.5"
+  }
+}
