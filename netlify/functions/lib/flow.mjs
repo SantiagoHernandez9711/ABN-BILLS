@@ -27,7 +27,7 @@ const setRecord = (start, rec) => store().setJSON(`period/${start}`, rec);
 
 export async function buildAttachments(draft) {
   return [
-    { filename: `${draft.fileBase}.xlsx`, content: buildExcel(draft), contentType: XLSX_MIME },
+    { filename: `${draft.fileBase}.xlsx`, content: await buildExcel(draft), contentType: XLSX_MIME },
     { filename: `${draft.fileBase}.docx`, content: await buildWord(draft), contentType: DOCX_MIME },
   ];
 }
